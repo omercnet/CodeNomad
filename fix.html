@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Repro: PR #463 FIX — worktree modal raised above drawer</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  /* Identical to bug.html EXCEPT the two z-index lines in the modal layer. */
+
+  :root {
+    --surface-base: #1a1a1d;
+    --surface-secondary: #232327;
+    --text-primary: #f3f3f3;
+    --text-secondary: #bdbdbd;
+    --border-base: #3a3a3f;
+    --overlay-scrim: rgba(0, 0, 0, 0.55);
+    --accent: #4f8cff;
+    --button-bg: #2a2a30;
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    height: 100%;
+    background: var(--surface-base);
+    color: var(--text-primary);
+    font: 14px/1.45 -apple-system, system-ui, sans-serif;
+  }
+
+  .app-shell { position: relative; width: 100%; height: 100vh; display: flex; flex-direction: column; }
+  .tab-bar { height: 44px; display: flex; align-items: center; padding: 0 12px; border-bottom: 1px solid var(--border-base); background: var(--surface-secondary); font-weight: 600; color: var(--text-secondary); }
+  .main-content { flex: 1; padding: 16px; color: var(--text-secondary); }
+
+  /* Drawer — UNCHANGED from origin/dev (zIndex 60, width 100vw on phone) */
+  .session-drawer-root { position: fixed; inset: 0; z-index: 60; pointer-events: auto; }
+  .session-drawer-backdrop { position: fixed; inset: 0; background-color: transparent; }
+  .session-drawer-paper {
+    position: fixed; top: 0; bottom: 0; left: 0;
+    width: 100vw;
+    background: var(--surface-secondary);
+    border-right: 1px solid var(--border-base);
+    display: flex; flex-direction: column; padding: 16px; gap: 12px;
+  }
+  .session-drawer-title { font-size: 18px; font-weight: 700; }
+  .session-row { padding: 10px 12px; border: 1px solid var(--border-base); border-radius: 8px; background: var(--surface-base); color: var(--text-primary); }
+  .session-row--active { border-color: var(--accent); }
+  .worktree-selector { margin-top: 8px; padding: 10px 12px; border-radius: 8px; background: var(--surface-base); border: 1px solid var(--border-base); color: var(--text-primary); font-weight: 600; }
+  .worktree-create-btn { margin-top: 8px; padding: 8px 12px; background: var(--accent); color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; }
+
+  /* ===== THE FIX: same .modal-overlay + .modal-wrapper as bug.html, but utility z-index raised ===== */
+  /* In Tailwind terms: `modal-overlay z-[60]` (overlay) and `fixed inset-0 z-[1310] ...` (wrapper). */
+  /* Mirrors packages/ui/src/components/alert-dialog.tsx lines 117-119. */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 60;              /* FIX: raised from 50 → 60 (matches drawer's z-index) */
+    background-color: var(--overlay-scrim);
+  }
+  .modal-wrapper {
+    position: fixed;
+    inset: 0;
+    z-index: 1310;            /* FIX: raised from 50 → 1310 (well above the drawer) */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+
+  .modal-surface {
+    width: 100%; max-width: 28rem; padding: 24px; border-radius: 12px;
+    background: var(--surface-base); color: var(--text-primary);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+    display: flex; flex-direction: column; gap: 20px;
+  }
+  .modal-title { font-size: 20px; font-weight: 600; margin: 0; }
+  .modal-desc { color: var(--text-secondary); font-size: 13px; margin: 0; }
+  .form-input { width: 100%; padding: 8px 10px; background: var(--surface-secondary); border: 1px solid var(--border-base); border-radius: 6px; color: var(--text-primary); font-size: 14px; }
+  .label-cap { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-secondary); font-weight: 600; }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
+  .btn { padding: 8px 14px; border-radius: 6px; border: 1px solid var(--border-base); background: var(--button-bg); color: var(--text-primary); cursor: pointer; font: inherit; }
+  .btn-primary { background: var(--accent); border-color: var(--accent); color: white; }
+
+  .repro-banner {
+    position: fixed; top: 8px; right: 8px;
+    z-index: 99999;
+    padding: 6px 10px;
+    background: #15803d; color: white;
+    font-size: 12px; font-weight: 700;
+    border-radius: 4px; box-shadow: 0 4px 8px rgba(0,0,0,0.4);
+  }
+</style>
+</head>
+<body>
+  <div class="repro-banner">FIX: modal overlay z-[60], content z-[1310] (above drawer)</div>
+
+  <div class="app-shell">
+    <div class="tab-bar">Project A &nbsp;·&nbsp; Session: Worktree work</div>
+    <div class="main-content">
+      <p>(Active session content sits here. Hidden by the open mobile drawer.)</p>
+    </div>
+  </div>
+
+  <div class="session-drawer-root" role="presentation">
+    <div class="session-drawer-backdrop" aria-hidden="true"></div>
+    <aside class="session-drawer-paper" role="dialog" aria-label="Session sidebar">
+      <div class="session-drawer-title">Sessions</div>
+      <div class="session-row session-row--active">▸ Worktree work (active)</div>
+      <div class="session-row">▸ Bug triage</div>
+      <div class="session-row">▸ New feature spike</div>
+
+      <div class="worktree-selector">Worktree: <code>main</code></div>
+      <button class="worktree-create-btn" type="button">+ Create worktree</button>
+    </aside>
+  </div>
+
+  <div class="modal-overlay" aria-hidden="true"></div>
+  <div class="modal-wrapper" role="presentation">
+    <div class="modal-surface" role="dialog" aria-modal="true" aria-labelledby="d-title">
+      <div>
+        <h2 id="d-title" class="modal-title">Create worktree</h2>
+        <p class="modal-desc">Creates a git worktree</p>
+      </div>
+      <div>
+        <div class="label-cap">Name</div>
+        <input class="form-input" placeholder="worktree-name" />
+      </div>
+      <div class="modal-actions">
+        <button class="btn">Cancel</button>
+        <button class="btn btn-primary">Create</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
